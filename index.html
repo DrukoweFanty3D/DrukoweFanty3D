@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>DrukoweFanty3D — sklep</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Wklej tutaj Client ID z PayPal Developer Dashboard -->
+  <script src="https://www.paypal.com/sdk/js?client-id=TU_WSTAW_PAYPAL_CLIENT_ID&currency=PLN&intent=capture"></script>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="brandmark">3D</span><div><b>DrukoweFanty3D</b><small>Druk 3D • wyjątkowe fanty</small></div></div>
+  <button class="cart-btn" onclick="openCart()">🛒 Koszyk <span id="cartCount">0</span></button>
+</header>
+
+<main>
+  <section class="hero">
+    <div><p class="eyebrow">DRUKOWEFANTY3D</p><h1>Małe fanty, duża frajda.</h1>
+    <p>Wybierz produkt, dodaj ilość do koszyka i przejdź do bezpiecznej płatności PayPal.</p></div>
+  </section>
+
+  <section class="products">
+    <h2>Produkty</h2>
+    <div id="productGrid" class="grid"></div>
+  </section>
+
+  <section class="info">
+    <div><b>📦 InPost</b><span>Jedyna forma dostawy • 15 zł</span></div>
+    <div><b>🖨️ Druk 3D</b><span>Produkty wykonywane na zamówienie.</span></div>
+    <div><b>💳 PayPal</b><span>Płatność online po kliknięciu „Zamawiam i płacę”.</span></div>
+  </section>
+</main>
+
+<div id="overlay" class="overlay hidden" onclick="closeCart(event)">
+  <aside class="drawer" onclick="event.stopPropagation()">
+    <button class="close" onclick="closeCart()">×</button>
+    <h2>Twój koszyk</h2>
+    <div id="cartItems"></div>
+    <div class="totals"><div>Produkty <b id="subtotal">0,00 zł</b></div><div>Dostawa <b>15,00 zł</b></div><div class="grand">Razem <b id="total">0,00 zł</b></div></div>
+    <button class="primary" onclick="openCheckout()">Zamawiam i płacę</button>
+  </aside>
+</div>
+
+<div id="checkout" class="overlay hidden" onclick="closeCheckout(event)">
+  <aside class="checkout" onclick="event.stopPropagation()">
+    <button class="close" onclick="closeCheckout()">×</button>
+    <h2>Dane do zamówienia</h2>
+    <p class="muted">Dostawa: InPost — 15 zł</p>
+    <form id="orderForm">
+      <label>Imię i nazwisko<input name="name" required autocomplete="name"></label>
+      <label>E-mail<input name="email" type="email" required autocomplete="email"></label>
+      <label>Telefon<input name="phone" required autocomplete="tel"></label>
+      <label>Adres / dane do dostawy<input name="address" required autocomplete="street-address"></label>
+      <label>Kod pocztowy<input name="zip" required autocomplete="postal-code"></label>
+      <label>Miasto<input name="city" required autocomplete="address-level2"></label>
+      <div id="checkoutSummary" class="summary"></div>
+      <div id="paypal-button-container"></div>
+      <p id="payError" class="error"></p>
+    </form>
+  </aside>
+</div>
+
+<script>
+const PRODUCTS = [
+  {id:"dino",emoji:"🦖",name:'Dino Duo',price:25,image:"images/dino-duo.jpg",desc:'Brelok dla par w stylu Dino Duo.'},
+  {id:"krolik",emoji:"🐰",name:'Zakładka Królik',price:5,image:"images/krolik.jpg",desc:'Urocza zakładka do książki.'},
+  {id:"autko",emoji:"🚗",name:'Brelok Autko',price:5,image:"images/autko.jpg",desc:'Mały brelok w kształcie samochodu.'},
+  {id:"serce",emoji:"💜",name:'Brelok Serce',price:12,image:"images/serce.jpg",desc:'Fioletowe serce jako efektowny brelok.'},
+  {id:"roza",emoji:"🌹",name:'Róża Love',price:10,image:"images/roza-love.jpg",desc:'Dekoracyjna róża Love z druku 3D.'},
+  {id:"xoxo",emoji:"💗",name:'XOXO',price:15,image:"images/xoxo.jpg",desc:'Dekoracyjny model XOXO z druku 3D.'},
+  {id:"karambit",emoji:"🔪",name:'Karambit',price:10,image:"images/karambit.jpg",desc:'Model karambitu z druku 3D.'}
+];
+const SHIPPING = 15;
+let cart = JSON.parse(localStorage.getItem("df3d_cart") || "{}");
+
+function money(v) { return v.toFixed(2).replace(".", ",") + " zł"; }
+function save() { localStorage.setItem("df3d_cart", JSON.stringify(cart)); render(); }
+function addToCart(id) { cart[id] = (cart[id] || 0) + 1; save(); }
+function changeQty(id, delta) { cart[id] = Math.max(0, (cart[id] || 0) + delta); if (!cart[id]) delete cart[id]; save(); }
+function removeItem(id) { delete cart[id]; save(); }
+function cartRows() { return Object.entries(cart).map(([id,qty]) => { const p=PRODUCTS.find(x=>x.id===id); return p ? {p,qty} : null; }).filter(Boolean); }
+function subtotal() { return cartRows().reduce((s,x)=>s+x.p.price*x.qty,0); }
+function render() {
+  document.getElementById("productGrid").innerHTML = PRODUCTS.map(p => `
+    <article class="card">
+      <div class="photo"><img src="${p.image}" alt="${p.name}" onerror="this.style.display='none';this.parentElement.classList.add('noimg')"><span class="fallback">${p.emoji}</span></div>
+      <div class="body"><div class="emoji">${p.emoji}</div><h3>${p.name}</h3><p>${p.desc}</p>
+      <div class="buyrow"><strong>${money(p.price)}</strong><button onclick="addToCart('${p.id}')">Dodaj do koszyka</button></div></div>
+    </article>`).join("");
+  const count = cartRows().reduce((s,x)=>s+x.qty,0);
+  document.getElementById("cartCount").textContent = count;
+  document.getElementById("cartItems").innerHTML = count ? cartRows().map(x => `
+    <div class="cartrow"><div><b>${x.p.emoji} ${x.p.name}</b><small>${money(x.p.price)} / szt.</small></div>
+      <div class="qty"><button onclick="changeQty('${x.p.id}',-1)">−</button><span>${x.qty}</span><button onclick="changeQty('${x.p.id}',1)">+</button><button class="trash" onclick="removeItem('${x.p.id}')">🗑️</button></div>
+    </div>`).join("") : '<p class="empty">Koszyk jest pusty.</p>';
+  document.getElementById("subtotal").textContent = money(subtotal());
+  document.getElementById("total").textContent = money(subtotal() + (count ? SHIPPING : 0));
+}
+function openCart() { document.getElementById("overlay").classList.remove("hidden"); render(); }
+function closeCart(e) { if(!e || e.target===document.getElementById("overlay")) document.getElementById("overlay").classList.add("hidden"); }
+function openCheckout() {
+  if(!cartRows().length) return;
+  document.getElementById("overlay").classList.add("hidden");
+  document.getElementById("checkout").classList.remove("hidden");
+  renderSummary();
+  renderPayPal();
+}
+function closeCheckout(e) { if(!e || e.target===document.getElementById("checkout")) document.getElementById("checkout").classList.add("hidden"); }
+function renderSummary() {
+  const lines = cartRows().map(x => `<div>${x.p.name} × ${x.qty} <b>${money(x.p.price*x.qty)}</b></div>`).join("");
+  document.getElementById("checkoutSummary").innerHTML = lines + `<hr><div>Dostawa <b>${money(SHIPPING)}</b></div><div class="grand">Razem <b>${money(subtotal()+SHIPPING)}</b></div>`;
+}
+function getOrderPayload() {
+  const f = new FormData(document.getElementById("orderForm"));
+  return {
+    customer: {name:f.get("name"),email:f.get("email"),phone:f.get("phone"),address:f.get("address"),zip:f.get("zip"),city:f.get("city")},
+    items: cartRows().map(x=>({id:x.p.id,qty:x.qty}))
+  };
+}
+function renderPayPal() {
+  const box = document.getElementById("paypal-button-container");
+  box.innerHTML = "";
+  document.getElementById("payError").textContent = "";
+  if (!window.paypal) { document.getElementById("payError").textContent="PayPal nie został skonfigurowany — wpisz Client ID w index.html."; return; }
+  paypal.Buttons({
+    style: {layout:"vertical",shape:"rect",label:"paypal"},
+    createOrder: async () => {
+      const payload = getOrderPayload();
+      const required = Object.values(payload.customer).every(Boolean);
+      if(!required || !payload.items.length) { document.getElementById("payError").textContent="Uzupełnij wszystkie dane i wybierz produkt."; throw new Error("validation"); }
+      const r = await fetch("api/create-order.php", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+      const d = await r.json(); if(!r.ok || !d.id) throw new Error(d.error || "Nie udało się utworzyć płatności.");
+      return d.id;
+    },
+    onApprove: async (data) => {
+      const payload = getOrderPayload();
+      const r = await fetch("api/capture-order.php", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({orderID:data.orderID,customer:payload.customer,items:payload.items})});
+      const d = await r.json(); if(!r.ok || !d.success) { document.getElementById("payError").textContent=d.error||"Płatność nie została potwierdzona."; return; }
+      cart={}; save(); window.location.href="success.html?order="+encodeURIComponent(data.orderID);
+    },
+    onError: err => { console.error(err); document.getElementById("payError").textContent="Wystąpił błąd PayPal. Spróbuj ponownie."; }
+  }).render("#paypal-button-container");
+}
+render();
+</script>
+</body></html>
